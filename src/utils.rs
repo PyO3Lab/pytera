@@ -1,7 +1,7 @@
 use pyo3::types::PyDict;
 use pyo3::prelude::*;
 use serde_json::{Value, Map};
-use pyo3::types::{PyBool, PyFloat, PyLong, PyString, PyList, PyTuple};
+use pyo3::types::{PyBool, PyFloat, PyInt, PyString, PyList, PyTuple};
 
 
 /// Helper function to convert Python objects to serde_json::Value
@@ -17,7 +17,7 @@ pub(crate) fn pyany_to_serde_json_value(obj: &Bound<'_, PyAny>) -> PyResult<Valu
     }
     
     // Check for int
-    if let Ok(i) = obj.downcast::<PyLong>() {
+    if let Ok(i) = obj.downcast::<PyInt>() {
         if let Ok(val) = i.extract::<i64>() {
             return Ok(Value::Number(val.into()));
         }
@@ -81,7 +81,7 @@ pub(crate) fn pyany_to_serde_json_value(obj: &Bound<'_, PyAny>) -> PyResult<Valu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pyo3::Python;
+    use pyo3::{ffi::c_str, Python};
     use serde_json::json;
     use std::sync::Once;
 
@@ -98,7 +98,7 @@ mod tests {
     fn test_kwargs2_serde_value_basic() {
         init_python();
         Python::with_gil(|py| {
-            let kwargs = PyDict::new_bound(py);
+            let kwargs = PyDict::new(py);
             kwargs.set_item("name", "Alice").unwrap();
             kwargs.set_item("age", 30).unwrap();
             kwargs.set_item("active", true).unwrap();
@@ -117,8 +117,8 @@ mod tests {
     fn test_kwargs2_serde_value_nested() {
         init_python();
         Python::with_gil(|py| {
-            let kwargs = PyDict::new_bound(py);
-            let nested_dict = PyDict::new_bound(py);
+            let kwargs = PyDict::new(py);
+            let nested_dict = PyDict::new(py);
             nested_dict.set_item("city", "New York").unwrap();
             nested_dict.set_item("zip", 10001).unwrap();
             
@@ -143,7 +143,7 @@ mod tests {
     fn test_kwargs2_serde_value_with_none() {
         init_python();
         Python::with_gil(|py| {
-            let kwargs = PyDict::new_bound(py);
+            let kwargs = PyDict::new(py);
             kwargs.set_item("name", "Charlie").unwrap();
             kwargs.set_item("middle_name", py.None()).unwrap();
             kwargs.set_item("age", 25).unwrap();
@@ -162,10 +162,10 @@ mod tests {
     fn test_kwargs2_serde_value_with_list() {
         init_python();
         Python::with_gil(|py| {
-            let kwargs = PyDict::new_bound(py);
-            let list = PyList::new_bound(py, &[1, 2, 3]);
+            let kwargs = PyDict::new(py);
+            let list = PyList::new(py, &[1, 2, 3]);
             
-            kwargs.set_item("numbers", list).unwrap();
+            kwargs.set_item("numbers", list.unwrap()).unwrap();
             kwargs.set_item("name", "David").unwrap();
             
             let result = pyany_to_serde_json_value(&kwargs).unwrap();
@@ -181,7 +181,7 @@ mod tests {
     fn test_kwargs2_serde_value_empty() {
         init_python();
         Python::with_gil(|py| {
-            let kwargs = PyDict::new_bound(py);
+            let kwargs = PyDict::new(py);
             
             let result = pyany_to_serde_json_value(&kwargs).unwrap();
             
@@ -196,17 +196,17 @@ mod tests {
         init_python();
         Python::with_gil(|py| {
             // Test infinity
-            let inf = py.eval_bound("float('inf')", None, None).unwrap();
+            let inf = py.eval(c_str!("float('inf')"), None, None).unwrap();
             let result = pyany_to_serde_json_value(&inf).unwrap();
             assert_eq!(result, json!("inf"));
             
             // Test negative infinity
-            let neg_inf = py.eval_bound("float('-inf')", None, None).unwrap();
+            let neg_inf = py.eval(c_str!("float('-inf')"), None, None).unwrap();
             let result = pyany_to_serde_json_value(&neg_inf).unwrap();
             assert_eq!(result, json!("-inf"));
             
             // Test NaN - check that it's a string containing "nan" (case insensitive)
-            let nan = py.eval_bound("float('nan')", None, None).unwrap();
+            let nan = py.eval(c_str!("float('nan')"), None, None).unwrap();
             let result = pyany_to_serde_json_value(&nan).unwrap();
             assert!(result.is_string());
             let nan_str = result.as_str().unwrap().to_lowercase();
@@ -219,7 +219,7 @@ mod tests {
         init_python();
         Python::with_gil(|py| {
             // Test very large integer that exceeds i64/u64
-            let large_int = py.eval_bound("10**100", None, None).unwrap();
+            let large_int = py.eval(c_str!("10**100"), None, None).unwrap();
             let result = pyany_to_serde_json_value(&large_int).unwrap();
             assert!(result.is_string());
             assert!(result.as_str().unwrap().starts_with("1000000"));
@@ -230,18 +230,18 @@ mod tests {
     fn test_kwargs2_serde_value_complex_nested() {
         init_python();
         Python::with_gil(|py| {
-            let kwargs = PyDict::new_bound(py);
+            let kwargs = PyDict::new(py);
             
             // Create complex nested structure
-            let inner_list = PyList::new_bound(py, &[1, 2, 3]);
-            let inner_dict = PyDict::new_bound(py);
+            let inner_list = PyList::new(py, &[1, 2, 3]);
+            let inner_dict = PyDict::new(py);
             inner_dict.set_item("nested_key", "nested_value").unwrap();
-            inner_dict.set_item("nested_list", inner_list).unwrap();
+            inner_dict.set_item("nested_list", inner_list.unwrap()).unwrap();
             
-            let item1 = "item1".to_object(py);
-            let inner_dict_obj = inner_dict.to_object(py);
+            let item1 = "item1".into_pyobject(py).unwrap();
+            let inner_dict_obj = inner_dict.into_pyobject(py).unwrap();
             
-            let outer_list = PyList::new_bound(py, vec![item1, inner_dict_obj]);
+            let outer_list = PyList::new(py, &[item1.as_ref(), inner_dict_obj.as_ref()]).unwrap();
             
             kwargs.set_item("complex", outer_list).unwrap();
             kwargs.set_item("simple", "value").unwrap();
