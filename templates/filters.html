@@ -1,0 +1,4 @@
+<p>Uppercase: {{ text | upper }}</p>
+<p>Length: {{ text | length }}</p>
+<p>Default: {{ missing | default(value="N/A") }}</p>
+<p>Slice: {{ list | slice(start=1, end=3) | join(sep=", ") }}</p>
