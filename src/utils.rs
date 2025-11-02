@@ -1,7 +1,7 @@
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PySequence};
 use pyo3::prelude::*;
 use serde_json::{Value, Map};
-use pyo3::types::{PyBool, PyFloat, PyInt, PyString, PyList, PyTuple};
+use pyo3::types::{PyBool, PyFloat, PyInt, PyString};
 
 
 /// Helper function to convert Python objects to serde_json::Value
@@ -46,26 +46,17 @@ pub(crate) fn pyany_to_serde_json_value(obj: &Bound<'_, PyAny>) -> PyResult<Valu
     }
     
     // Check for list
-    if let Ok(list) = obj.downcast::<PyList>() {
-        let mut vec = Vec::new();
-        for item in list.iter() {
-            vec.push(pyany_to_serde_json_value(&item)?);
-        }
-        return Ok(Value::Array(vec));
-    }
-    
-    // Check for tuple
-    if let Ok(tuple) = obj.downcast::<PyTuple>() {
-        let mut vec = Vec::new();
-        for item in tuple.iter() {
-            vec.push(pyany_to_serde_json_value(&item)?);
+    if let Ok(list) = obj.downcast::<PySequence>() {
+        let mut vec = Vec::with_capacity(list.len()?);
+        for item in list.try_iter()? {
+            vec.push(pyany_to_serde_json_value(&item?)?);
         }
         return Ok(Value::Array(vec));
     }
     
     // Check for dict
     if let Ok(dict) = obj.downcast::<PyDict>() {
-        let mut map = Map::new();
+        let mut map = Map::with_capacity(dict.len());
         for (key, value) in dict.iter() {
             let key_str = key.extract::<String>()?;
             let json_value = pyany_to_serde_json_value(&value)?;
@@ -82,6 +73,7 @@ pub(crate) fn pyany_to_serde_json_value(obj: &Bound<'_, PyAny>) -> PyResult<Valu
 mod tests {
     use super::*;
     use pyo3::{ffi::c_str, Python};
+    use pyo3::types::PyList;
     use serde_json::json;
     use std::sync::Once;
 

@@ -1,8 +1,16 @@
 from __future__ import annotations
-from typing import Any, Optional, Mapping, Final
+from typing import Any, Final
 
-__all__: Final[list[str]] = ["PyTera"]
+__all__: Final[list[str]] = ["PyTera", "PyTeraException", "PyTeraRenderException"]
 
+
+class PyTeraException(Exception):
+    """Base exception for pytera bindings (Rust Tera errors)."""
+    ...
+
+class PyTeraRenderException(PyTeraException):
+    """Rendering-related errors (e.g., missing template, filter/function/test errors)."""
+    ...
 
 class PyTera:
 
@@ -28,7 +36,7 @@ class PyTera:
         """
         ...
 
-    def render_template(self, template: str, kwargs: Optional[Mapping[str, Any]] = ...) -> str:
+    def render_template(self, template: str, **kwargs: Any) -> str:
         """Render the specified template and return the string result.
 
         Args:
