@@ -39,37 +39,52 @@ uv add pytera
 ## 快速开始
 
 ```python
+import os
 from pytera import PyTera
 
-# 使用模板目录初始化
-tera = PyTera("templates/*.html")
+template_dir = os.path.join(os.path.dirname(__file__), "templates")
+tera = PyTera(f"{template_dir}/*.html")
 
-# 渲染模板
-result = tera.render_template("hello.html", {"name": "World"})
-print(result)  # Hello World!
+result = tera.render_template("basic_variables.html", name="Alice", age=30)
+print(result)  # Hello Alice! You are 30 years old.
 ```
+
+> ℹ️ **Glob 模式提示**：当前模板文件直接位于 `templates/` 目录下，因此使用 `PyTera(f"{template_dir}/*.html")` 即可。如果未来将模板拆分到多级子目录，请改用 `PyTera(f"{template_dir}/**/*.html")` 以递归加载所有模板。
 
 ## 使用示例
 
 ### 基本变量
 
 ```python
-from pytera import PyTera
-
 tera = PyTera("templates/*.html")
-result = tera.render_template("basic_variables.html", {
-    "name": "Alice",
-    "age": 30
-})
-# 输出：Hello Alice! You are 30 years old.
+result = tera.render_template(
+    "basic_variables.html",
+    name="Alice",
+    age=30,
+)
+print(result)  # Hello Alice! You are 30 years old.
+```
+
+```html
+<!-- templates/basic_variables.html -->
+Hello {{ name }}! You are {{ age }} years old.
 ```
 
 ### 条件语句
 
 ```python
 user = {"name": "Bob", "is_admin": True}
-result = tera.render_template("conditionals.html", {"user": user})
-# 输出：Welcome, Administrator Bob!
+result = tera.render_template("conditionals.html", user=user)
+print(result)  # Welcome, Administrator Bob!
+```
+
+```html
+<!-- templates/conditionals.html -->
+{% if user.is_admin %}
+Welcome, Administrator {{ user.name }}!
+{% else %}
+Hello, {{ user.name }}!
+{% endif %}
 ```
 
 ### 循环
@@ -80,7 +95,17 @@ items = [
     {"name": "Banana", "price": 0.75},
     {"name": "Cherry", "price": 2.25},
 ]
-result = tera.render_template("loops.html", {"items": items})
+result = tera.render_template("loops.html", items=items)
+print(result)
+```
+
+```html
+<!-- templates/loops.html -->
+<ul>
+{% for item in items %}
+<li>{{ item.name }}: {{ item.price | round(precision=2) }}</li>
+{% endfor %}
+</ul>
 ```
 
 ### 过滤器
@@ -91,140 +116,136 @@ data = {
     "missing": None,
     "list": ["apple", "banana", "cherry", "date"],
 }
-result = tera.render_template("filters.html", data)
+result = tera.render_template("filters.html", **data)
+print(result)
+```
+
+```html
+<!-- templates/filters.html -->
+<p>Uppercase: {{ text | upper }}</p>
+<p>Length: {{ text | length }}</p>
+<p>Default: {{ missing | default(value="N/A") }}</p>
+<p>Slice: {{ list | slice(start=1, end=3) | join(sep=", ") }}</p>
 ```
 
 ### 模板继承
 
-```python
-# base.html
+```html
+<!-- templates/base.html -->
 <!DOCTYPE html>
 <html>
 <head>
     <title>{% block title %}Default Title{% endblock %}</title>
 </head>
 <body>
-    <h1>My Website</h1>
-    {% block content %}{% endblock %}
+    <header>
+        <h1>My Website</h1>
+    </header>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+    <footer>
+        <p>&copy; 2023</p>
+    </footer>
 </body>
 </html>
+```
 
-# child.html
+```html
+<!-- templates/child.html -->
 {% extends "base.html" %}
 
 {% block title %}Home Page{% endblock %}
 
 {% block content %}
 <h2>Welcome to {{ site_name }}</h2>
+<p>This is the home page content.</p>
+{% if user %}
 <p>Hello, {{ user.name }}!</p>
+{% endif %}
 {% endblock %}
 ```
 
 ### Flask 集成
 
 ```python
-from flask import Flask
+import os
+from flask import Flask, render_template
 from pytera import PyTera
 
-app = Flask(__name__)
-tera = PyTera("templates/*.html")
+template_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
+tera = PyTera(f"{template_dir}/*.html")
+
+app = Flask(__name__, template_folder=os.path.abspath(template_dir))
 
 @app.route("/")
 def index():
     return tera.render_template(
-        "page.html",
-        {"site_name": "My Site", "user": {"name": "David"}}
+        "child.html",
+        site_name="example",
+        user={"name": "David"},
     )
 
-if __name__ == "__main__":
-    app.run()
+@app.route("/child")
+def child():
+    return render_template(
+        "child.html",
+        site_name="example",
+        user={"name": "David"},
+    )
 ```
 
-## API 参考
+更多包含 `/basic_variables`、`/conditionals`、`/filters`、`/loops` 路由的完整示例请查看 [examples/app.py](examples/app.py)。
 
-### PyTera 类
-
-#### `__init__(glob: str)`
-
-使用模板 glob 模式初始化 PyTera。
-
-**参数：**
-- `glob` (str): 模板文件的 glob 模式（例如 `"templates/**/*.html"`）
-
-**异常：**
-- `ValueError`: glob 模式无效或模板配置错误
-- `RuntimeError`: 模板解析失败或继承问题
-- `UnicodeDecodeError`: UTF-8 解码错误
-- `OSError`: 文件 I/O 错误
-
-#### `render_template(template: str, kwargs: Optional[Mapping[str, Any]] = None) -> str`
-
-使用给定上下文渲染模板。
-
-**参数：**
-- `template` (str): 模板名称/键
-- `kwargs` (Optional[Mapping[str, Any]]): 上下文字典
-
-**返回：**
-- `str`: 渲染后的模板内容
-
-**异常：**
-- `ValueError`: 上下文键无效或配置错误
-- `RuntimeError`: 模板渲染错误
-- `UnicodeDecodeError`: 编码错误
-- `OSError`: 文件 I/O 错误
-
-#### `templates() -> list[str]`
-
-获取已加载模板名称列表。
-
-**返回：**
-- `list[str]`: 模板名称列表
 
 ## 模板语法
 
-PyTera 支持完整的 Tera 模板语法：
+[examples/app.py](examples/app.py) 中渲染的模板覆盖了 Tera 语法的核心用法：
 
 ### 变量
-```
-{{ variable }}
-{{ user.name }}
+```html
+Hello {{ name }}! You are {{ age }} years old.
 ```
 
 ### 条件语句
-```
-{% if condition %}
-内容在这里
-{% elif other_condition %}
-其他内容
+```html
+{% if user.is_admin %}
+Welcome, Administrator {{ user.name }}!
 {% else %}
-默认内容
+Hello, {{ user.name }}!
 {% endif %}
 ```
 
 ### 循环
-```
+```html
+<ul>
 {% for item in items %}
-{{ item.name }}: {{ item.price }}
+<li>{{ item.name }}: {{ item.price | round(precision=2) }}</li>
 {% endfor %}
+</ul>
 ```
 
 ### 过滤器
-```
-{{ text | upper }}
-{{ number | round(precision=2) }}
-{{ list | slice(start=1, end=3) | join(sep=", ") }}
+```html
+<p>Uppercase: {{ text | upper }}</p>
+<p>Length: {{ text | length }}</p>
+<p>Default: {{ missing | default(value="N/A") }}</p>
+<p>Slice: {{ list | slice(start=1, end=3) | join(sep=", ") }}</p>
 ```
 
 ### 模板继承
-```
-<!-- base.html -->
-{% block content %}{% endblock %}
-
-<!-- child.html -->
+```html
 {% extends "base.html" %}
-{% block content %}子内容{% endblock %}
+{% block title %}Home Page{% endblock %}
+{% block content %}
+<h2>Welcome to {{ site_name }}</h2>
+{% if user %}
+<p>Hello, {{ user.name }}!</p>
+{% endif %}
+{% endblock %}
 ```
+
+更多功能（如宏、测试、自定义过滤器等）请参考 [Tera 文档](https://keats.github.io/tera/docs/#getting-started)。
 
 ## 错误处理
 
@@ -235,13 +256,6 @@ PyTera 为常见问题提供详细的错误信息：
 - **解析错误**：模板中的语法错误
 - **继承问题**：循环依赖或缺少父模板
 
-## 性能
-
-PyTera 专为高性能而设计：
-
-- Rust 中的零拷贝字符串操作
-- 高效的模板编译和缓存
-- 通过 PyO3 最小化 Python 开销
 
 ## 开发
 
@@ -314,7 +328,7 @@ PyTera 使用 MIT 许可证。详见 [LICENSE](LICENSE)。
 
 ## 致谢
 
-- [Tera](https://tera.netlify.app/) - Rust 模板引擎
+- [Tera](https://keats.github.io/tera/docs/#getting-started/) - Rust 模板引擎
 - [PyO3](https://pyo3.rs/) - Rust 的 Python 绑定
 - [Maturin](https://www.maturin.rs/) - Python 扩展构建工具
 

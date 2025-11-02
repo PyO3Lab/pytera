@@ -39,37 +39,54 @@ uv add pytera
 ## Quick Start
 
 ```python
+import os
 from pytera import PyTera
 
-# Initialize with template directory
-tera = PyTera("templates/*.html")
+template_dir = os.path.join(os.path.dirname(__file__), "templates")
+tera = PyTera(f"{template_dir}/*.html")
 
-# Render a template
-result = tera.render_template("hello.html", {"name": "World"})
-print(result)  # Hello World!
+result = tera.render_template("basic_variables.html", name="Alice", age=30)
+print(result)  # Hello Alice! You are 30 years old.
 ```
+
+> ℹ️ **Glob pattern tips**: The current templates live directly under `templates/`, so `PyTera(f"{template_dir}/*.html")` works. If you reorganize templates into nested subdirectories, switch to `PyTera(f"{template_dir}/**/*.html")` to load them recursively.
 
 ## Usage Examples
 
 ### Basic Variables
 
 ```python
-from pytera import PyTera
-
 tera = PyTera("templates/*.html")
-result = tera.render_template("basic_variables.html", {
-    "name": "Alice",
-    "age": 30
-})
-# Output: Hello Alice! You are 30 years old.
+result = tera.render_template(
+    "basic_variables.html",
+    name="Alice",
+    age=30,
+)
+print(result)  # Hello Alice! You are 30 years old.
+```
+
+> ℹ️ **Glob pattern tips**: Current templates live directly under `templates/`, so `PyTera(f"{template_dir}/*.html")` works. If you organize templates into nested subdirectories later, switch to `PyTera(f"{template_dir}/**/*.html")` to load them recursively.
+
+```html
+<!-- templates/basic_variables.html -->
+Hello {{ name }}! You are {{ age }} years old.
 ```
 
 ### Conditionals
 
 ```python
 user = {"name": "Bob", "is_admin": True}
-result = tera.render_template("conditionals.html", {"user": user})
-# Output: Welcome, Administrator Bob!
+result = tera.render_template("conditionals.html", user=user)
+print(result)  # Welcome, Administrator Bob!
+```
+
+```html
+<!-- templates/conditionals.html -->
+{% if user.is_admin %}
+Welcome, Administrator {{ user.name }}!
+{% else %}
+Hello, {{ user.name }}!
+{% endif %}
 ```
 
 ### Loops
@@ -80,7 +97,17 @@ items = [
     {"name": "Banana", "price": 0.75},
     {"name": "Cherry", "price": 2.25},
 ]
-result = tera.render_template("loops.html", {"items": items})
+result = tera.render_template("loops.html", items=items)
+print(result)
+```
+
+```html
+<!-- templates/loops.html -->
+<ul>
+{% for item in items %}
+<li>{{ item.name }}: {{ item.price | round(precision=2) }}</li>
+{% endfor %}
+</ul>
 ```
 
 ### Filters
@@ -91,141 +118,136 @@ data = {
     "missing": None,
     "list": ["apple", "banana", "cherry", "date"],
 }
-result = tera.render_template("filters.html", data)
+result = tera.render_template("filters.html", **data)
+print(result)
+```
+
+```html
+<!-- templates/filters.html -->
+<p>Uppercase: {{ text | upper }}</p>
+<p>Length: {{ text | length }}</p>
+<p>Default: {{ missing | default(value="N/A") }}</p>
+<p>Slice: {{ list | slice(start=1, end=3) | join(sep=", ") }}</p>
 ```
 
 ### Template Inheritance
 
-```python
-# base.html
+```html
+<!-- templates/base.html -->
 <!DOCTYPE html>
 <html>
 <head>
     <title>{% block title %}Default Title{% endblock %}</title>
 </head>
 <body>
-    <h1>My Website</h1>
-    {% block content %}{% endblock %}
+    <header>
+        <h1>My Website</h1>
+    </header>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+    <footer>
+        <p>&copy; 2023</p>
+    </footer>
 </body>
 </html>
+```
 
-# child.html
+```html
+<!-- templates/child.html -->
 {% extends "base.html" %}
 
 {% block title %}Home Page{% endblock %}
 
 {% block content %}
 <h2>Welcome to {{ site_name }}</h2>
+<p>This is the home page content.</p>
+{% if user %}
 <p>Hello, {{ user.name }}!</p>
+{% endif %}
 {% endblock %}
 ```
 
 ### Flask Integration
 
 ```python
-from flask import Flask
+import os
+from flask import Flask, render_template
 from pytera import PyTera
 
-app = Flask(__name__)
-tera = PyTera("templates/*.html")
+template_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
+tera = PyTera(f"{template_dir}/*.html")
+
+app = Flask(__name__, template_folder=os.path.abspath(template_dir))
 
 @app.route("/")
 def index():
     return tera.render_template(
-        "page.html",
-        {"site_name": "My Site", "user": {"name": "David"}}
+        "child.html",
+        site_name="example",
+        user={"name": "David"},
     )
 
-if __name__ == "__main__":
-    app.run()
+@app.route("/child")
+def child():
+    return render_template(
+        "child.html",
+        site_name="example",
+        user={"name": "David"},
+    )
 ```
 
-## API Reference
+For a complete working example with additional routes (`/basic_variables`, `/conditionals`, `/filters`, `/loops`), see [examples/app.py](examples/app.py).
 
-### PyTera Class
-
-#### `__init__(glob: str)`
-
-Initialize PyTera with a template glob pattern.
-
-**Parameters:**
-- `glob` (str): Glob pattern for template files (e.g., `"templates/**/*.html"`)
-
-
-**Raises:**
-- `ValueError`: Invalid glob pattern or template configuration errors
-- `RuntimeError`: Template parsing failures or inheritance issues
-- `UnicodeDecodeError`: UTF-8 decoding errors
-- `OSError`: File I/O errors
-
-#### `render_template(template: str, kwargs: Optional[Mapping[str, Any]] = None) -> str`
-
-Render a template with the given context.
-
-**Parameters:**
-- `template` (str): Template name/key
-- `kwargs` (Optional[Mapping[str, Any]]): Context dictionary
-
-**Returns:**
-- `str`: Rendered template content
-
-**Raises:**
-- `ValueError`: Invalid context keys or configuration errors
-- `RuntimeError`: Template rendering errors
-- `UnicodeDecodeError`: Encoding errors
-- `OSError`: File I/O errors
-
-#### `templates() -> list[str]`
-
-Get list of loaded template names.
-
-**Returns:**
-- `list[str]`: Template names
 
 ## Template Syntax
 
-PyTera supports the full Tera template syntax:
+The templates rendered in [examples/app.py](examples/app.py) cover the core pieces of Tera syntax:
 
 ### Variables
-```
-{{ variable }}
-{{ user.name }}
+```html
+Hello {{ name }}! You are {{ age }} years old.
 ```
 
 ### Conditionals
-```
-{% if condition %}
-Content here
-{% elif other_condition %}
-Other content
+```html
+{% if user.is_admin %}
+Welcome, Administrator {{ user.name }}!
 {% else %}
-Default content
+Hello, {{ user.name }}!
 {% endif %}
 ```
 
 ### Loops
-```
+```html
+<ul>
 {% for item in items %}
-{{ item.name }}: {{ item.price }}
+<li>{{ item.name }}: {{ item.price | round(precision=2) }}</li>
 {% endfor %}
+</ul>
 ```
 
 ### Filters
-```
-{{ text | upper }}
-{{ number | round(precision=2) }}
-{{ list | slice(start=1, end=3) | join(sep=", ") }}
+```html
+<p>Uppercase: {{ text | upper }}</p>
+<p>Length: {{ text | length }}</p>
+<p>Default: {{ missing | default(value="N/A") }}</p>
+<p>Slice: {{ list | slice(start=1, end=3) | join(sep=", ") }}</p>
 ```
 
 ### Template Inheritance
-```
-<!-- base.html -->
-{% block content %}{% endblock %}
-
-<!-- child.html -->
+```html
 {% extends "base.html" %}
-{% block content %}Child content{% endblock %}
+{% block title %}Home Page{% endblock %}
+{% block content %}
+<h2>Welcome to {{ site_name }}</h2>
+{% if user %}
+<p>Hello, {{ user.name }}!</p>
+{% endif %}
+{% endblock %}
 ```
+
+For more template features—such as macros, tests, and custom filters—consult the [Tera documentation](https://keats.github.io/tera/docs/#getting-started).
 
 ## Error Handling
 
@@ -236,13 +258,6 @@ PyTera provides detailed error messages for common issues:
 - **Parsing Errors**: Syntax errors in templates
 - **Inheritance Issues**: Circular dependencies or missing parents
 
-## Performance
-
-PyTera is designed for high performance:
-
-- Zero-copy string operations in Rust
-- Efficient template compilation and caching
-- Minimal Python overhead through PyO3
 
 ## Development
 
@@ -315,7 +330,7 @@ PyTera is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
-- [Tera](https://keats.github.io/tera/) - The Rust templating engine
+- [Tera](https://keats.github.io/tera/docs/#getting-started) - The Rust templating engine
 - [PyO3](https://pyo3.rs/) - Python bindings for Rust
 - [Maturin](https://www.maturin.rs/) - Build tool for Python extensions
 
