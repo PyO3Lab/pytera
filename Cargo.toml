@@ -1,6 +1,6 @@
 [package]
 name = "pytera"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "A fast, Python templating engine powered by Rust's Tera library"
 license = "MIT"
@@ -19,8 +19,8 @@ serde_json = "1.0.145"
 tera = "1.20.0"
 
 [profile.release]
-opt-level = 'z'
+opt-level = 3  
 strip = true
 panic = 'abort'
 codegen-units = 1
-lto = "thin"
+lto = "fat"

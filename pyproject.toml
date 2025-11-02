@@ -1,6 +1,6 @@
 [project]
 name = "pytera"
-version = "0.1.1"
+version = "0.1.2"
 description = "A fast, Python templating engine powered by Rust's Tera library"
 readme = "README.md"
 license = { text = "MIT" }
