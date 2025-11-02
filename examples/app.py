@@ -24,13 +24,13 @@ def child():
 
 @app.route("/basic_variables")
 def basic_variables():
-    return tera.render_template("basic_variables.html", {"name": "Alice", "age": 30})
+    return tera.render_template("basic_variables.html", **{"name": "Alice", "age": 30})
 
 
 @app.route("/conditionals")
 def conditionals():
     return tera.render_template(
-        "conditionals.html", {"user": {"name": "Bob", "is_admin": True}}
+        "conditionals.html", **{"user": {"name": "Bob", "is_admin": True}}
     )
 
 
@@ -38,7 +38,7 @@ def conditionals():
 def filters():
     return tera.render_template(
         "filters.html",
-        {
+        **{
             "text": "hello world",
             "missing": None,
             "list": ["apple", "banana", "cherry", "date"],
